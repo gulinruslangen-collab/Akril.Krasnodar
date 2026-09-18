@@ -3,6 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+    (function(m,e,t,r,i,k,a){
+        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+    })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=112782911', 'ym');
+
+    ym(112782911, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+</script>
+<!-- /Yandex.Metrika counter -->
 <title>Акрил Краснодар</title>
 <meta name="description" content="Столешницы из акрилового камня по вашим размерам. Кухни, ванные, барные стойки и подоконники. Производство в Краснодарском крае.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -405,6 +417,9 @@ html:has(.lightbox[open]) { overflow: hidden; }
 .choice input:checked + span { background: var(--cream); color: var(--walnut); }
 .choice input:focus-visible + span { outline: 2px dashed var(--cream); outline-offset: 4px; }
 .form-actions { display: grid; gap: 14px; justify-items: start; }
+/* Сообщение, если заявка не ушла: те же стили, что у ошибок полей */
+.form-actions .err { opacity: 1; transform: none; max-width: 34ch; }
+.form-actions .err:empty { display: none; } /* пока ошибки нет, блок не занимает места */
 .done-title { font-size: var(--t-display); line-height: 0.9; text-transform: uppercase; text-wrap: balance; }
 .form-done .body { max-width: 26ch; }
 #done-phone { white-space: nowrap; }
@@ -543,6 +558,7 @@ html:has(.lightbox[open]) { overflow: hidden; }
 
 </head>
 <body>
+<noscript><div><img src="https://mc.yandex.ru/watch/112782911" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
 <div id="stage-bg" aria-hidden="true"></div>
 <div id="stage-dim" aria-hidden="true"></div>
 <canvas id="stage" aria-hidden="true"></canvas>
@@ -785,6 +801,7 @@ html:has(.lightbox[open]) { overflow: hidden; }
           </div>
           <div class="form-actions">
             <button class="btn-fill" type="submit" id="f-submit"><span class="btn-label">Записаться на замер</span></button>
+            <p class="err" id="f-send-err" role="alert"></p>
             <p class="legal"><span class="ember">*</span> Нажимая кнопку, вы соглашаетесь на обработку персональных данных</p>
           </div>
         </form>
@@ -794,7 +811,6 @@ html:has(.lightbox[open]) { overflow: hidden; }
           <hr class="dash">
           <p class="body">Перезвоним на <span id="done-phone"></span>, чтобы договориться о дне замера.</p>
           <p class="label done-call">Не хотите ждать? Позвоните: <a href="tel:+79181505457">+7 (918) 150-54-57</a></p>
-          <p class="legal"><span class="ember">*</span> Первая версия сайта: отправка заявок пока не подключена, данные никуда не ушли</p>
           <button class="btn-ghost" type="button" id="form-reset">Заполнить заново</button>
         </div>
       </div>
@@ -1202,6 +1218,45 @@ window.__defineScene = function () {
   'use strict';
   var doc = document.documentElement;
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Цели Яндекс.Метрики. На опубликованной ссылке счётчика нет, поэтому вызов защищён проверкой */
+  var YM_ID = 112782911;
+  function goal(name) {
+    try { if (typeof window.ym === 'function') window.ym(YM_ID, 'reachGoal', name); } catch (e) {}
+  }
+
+  /* Заявка уходит в n8n (адрес публичный, ключей и токенов на странице нет), оттуда бот пишет в Telegram */
+  var LEAD_URL = 'https://ruslan-skywalker.app.n8n.cloud/webhook/website-lead';
+  var LEAD_SOURCE = 'akrilkrasnodar.ru';
+  var LEAD_TIMEOUT = 12000;
+  var UTM = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+  function leadExtras(out) {
+    out.page_url = location.href;
+    out.referrer = document.referrer || '';
+    var q = null;
+    try { q = new URLSearchParams(location.search); } catch (e) {}
+    UTM.forEach(function (k) { out[k] = q ? (q.get(k) || '') : ''; });
+    return out;
+  }
+  function sendLead(data) {
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, LEAD_TIMEOUT) : 0;
+    var opts = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      keepalive: true
+    };
+    if (ctrl) opts.signal = ctrl.signal;
+    return fetch(LEAD_URL, opts).then(function (res) {
+      clearTimeout(timer);
+      if (!res.ok) throw new Error('n8n ответил ' + res.status);
+      return res;
+    }, function (err) {
+      clearTimeout(timer);
+      throw err;
+    });
+  }
   var mqWide = window.matchMedia('(min-width: 900px)');
   function $all(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
 
@@ -1308,10 +1363,16 @@ window.__defineScene = function () {
   ['wheel', 'touchstart', 'keydown'].forEach(function (ev) {
     window.addEventListener(ev, function () { lock = null; if (journey) journey.release(); }, { passive: true });
   });
-  /* Переход по пункту меню или кнопке-якорю: пока страница едет, разделы не переключаем */
+  /* Переход по пункту меню или кнопке-якорю: пока страница едет, разделы не переключаем.
+     Здесь же считаем звонки и переходы в мессенджеры */
   document.addEventListener('click', function (e) {
-    var a = e.target.closest && e.target.closest('a[href^="#"]');
-    if (a && journey && !reduce) journey.hold(2500);
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a) return;
+    var href = a.getAttribute('href') || '';
+    if (href.charAt(0) === '#') { if (journey && !reduce) journey.hold(2500); return; }
+    if (href.indexOf('tel:') === 0) goal('phone');
+    else if (href.indexOf('wa.me') > 0) goal('whatsapp');
+    else if (href.indexOf('t.me') > 0) goal('telegram');
   });
   requestUpdate();
 
@@ -1363,7 +1424,10 @@ window.__defineScene = function () {
   var done = document.getElementById('form-done');
   var fName = document.getElementById('f-name');
   var fPhone = document.getElementById('f-phone');
+  var fNote = document.getElementById('f-note');
+  var sendErr = document.getElementById('f-send-err');
   var submit = document.getElementById('f-submit');
+  var sending = false;
   var submitLabel = submit.querySelector('.btn-label');
   var prevDigits = '', labelTimer = 0;
   var EASE_OUT_CSS = 'cubic-bezier(0.23, 1, 0.32, 1)', EASE_IN_OUT_CSS = 'cubic-bezier(0.77, 0, 0.175, 1)';
@@ -1421,6 +1485,7 @@ window.__defineScene = function () {
     });
   }
 
+  function setSendErr(msg) { sendErr.textContent = msg || ''; }
   fPhone.addEventListener('input', function (e) {
     var raw = fPhone.value;
     var pos = fPhone.selectionStart == null ? raw.length : fPhone.selectionStart;
@@ -1445,9 +1510,10 @@ window.__defineScene = function () {
       fPhone.setSelectionRange(i, i);
     }
     setErr('phone', '');
+    setSendErr('');
   });
-  fName.addEventListener('input', function () { setErr('name', ''); });
-  $all('input[name="kind"]').forEach(function (r) { r.addEventListener('change', function () { setErr('kind', ''); }); });
+  fName.addEventListener('input', function () { setErr('name', ''); setSendErr(''); });
+  $all('input[name="kind"]').forEach(function (r) { r.addEventListener('change', function () { setErr('kind', ''); setSendErr(''); }); });
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
@@ -1459,14 +1525,35 @@ window.__defineScene = function () {
     if (digits.length !== 11) { setErr('phone', 'Введите номер полностью: 10 цифр после +7'); first = first || fPhone; }
     if (!kind) { setErr('kind', 'Выберите, что нужно изготовить'); first = first || form.querySelector('input[name="kind"]'); }
     if (first) { first.focus(); return; }
+    if (sending) return; // второй клик, пока заявка в пути, ничего не делает
+    sending = true;
+    setSendErr('');
     submit.disabled = true;
     submit.setAttribute('aria-busy', 'true');
     submit.style.width = submit.getBoundingClientRect().width + 'px';
     setSubmitLabel('Отправляем', true);
-    setTimeout(function () {
+
+    /* Ответ может прийти за 100 мс: держим надпись «Отправляем» хотя бы 450 мс, чтобы она не мигала */
+    var t0 = performance.now();
+    function afterMin(fn) {
+      return function (arg) { setTimeout(function () { fn(arg); }, Math.max(0, 450 - (performance.now() - t0))); };
+    }
+    var note = fNote.value.trim(), kindValue = kind.value;
+    var lead = leadExtras({
+      name: name,
+      phone: '+' + digits,
+      message: note ? kindValue + '. ' + note : kindValue,
+      source: LEAD_SOURCE,
+      kind: kindValue,
+      note: note
+    });
+    sendLead(lead).then(afterMin(function () {
+      sending = false;
+      goal('zayavka');
       document.getElementById('done-name').textContent = name;
       document.getElementById('done-phone').textContent = fmtPhone(digits);
       swapBlocks(form, done, 150, function () {
+        clearForm();
         submit.disabled = false;
         submit.removeAttribute('aria-busy');
         setSubmitLabel('Записаться на замер', false);
@@ -1476,13 +1563,25 @@ window.__defineScene = function () {
         var top = done.getBoundingClientRect().top;
         if (top < navH + 12) window.scrollBy({ top: top - navH - 24, behavior: reduce ? 'auto' : 'smooth' });
       });
-    }, 700);
+    }), afterMin(function (err) {
+      /* Заявка не ушла: честно говорим об этом и оставляем заполненную форму */
+      sending = false;
+      submit.disabled = false;
+      submit.removeAttribute('aria-busy');
+      setSubmitLabel('Записаться на замер', false);
+      setSendErr('Заявка не отправилась. Проверьте интернет и попробуйте ещё раз или позвоните: +7 (918) 150-54-57');
+      try { console.error('Заявка не ушла в n8n:', err); } catch (e) {}
+    }));
   });
+  function clearForm() {
+    form.reset();
+    prevDigits = '';
+    ['name', 'phone', 'kind'].forEach(function (k) { setErr(k, ''); });
+    setSendErr('');
+  }
   document.getElementById('form-reset').addEventListener('click', function () {
     swapBlocks(done, form, 150, function () {
-      form.reset();
-      prevDigits = '';
-      ['name', 'phone', 'kind'].forEach(function (k) { setErr(k, ''); });
+      clearForm();
       if (!reduce) {
         form.classList.add('is-entering');
         form.addEventListener('animationend', function end(e) {
