@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="canonical" href="https://www.akrilkrasnodar.ru/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <!-- Yandex.Metrika counter -->
 <script type="text/javascript">
     (function(m,e,t,r,i,k,a){
@@ -420,6 +425,16 @@ html:has(.lightbox[open]) { overflow: hidden; }
 /* Сообщение, если заявка не ушла: те же стили, что у ошибок полей */
 .form-actions .err { opacity: 1; transform: none; max-width: 34ch; }
 .form-actions .err:empty { display: none; } /* пока ошибки нет, блок не занимает места */
+.consent { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; max-width: 40ch; }
+.consent input {
+  width: 18px; height: 18px; flex: none; margin: 2px 0 0; accent-color: var(--cream); cursor: pointer;
+}
+.consent input:focus-visible { outline: 2px dashed var(--cream); outline-offset: 2px; }
+.consent span { font-size: var(--t-label-lg); line-height: 1.4; color: var(--cream-72); }
+.consent a { color: var(--cream); }
+.foot-requisites { display: grid; gap: 6px; }
+.legal a { color: inherit; text-decoration: underline; text-underline-offset: 2px; transition: color 180ms ease; }
+.js .legal a:hover { color: var(--cream); }
 .done-title { font-size: var(--t-display); line-height: 0.9; text-transform: uppercase; text-wrap: balance; }
 .form-done .body { max-width: 26ch; }
 #done-phone { white-space: nowrap; }
@@ -800,9 +815,13 @@ html:has(.lightbox[open]) { overflow: hidden; }
             <p class="help" id="f-note-help">Размеры не нужны: мастер снимет их на замере</p>
           </div>
           <div class="form-actions">
+            <label class="consent" for="f-consent">
+              <input type="checkbox" id="f-consent" name="consent">
+              <span>Я согласен на обработку персональных данных и ознакомился с <a href="/privacy.html" target="_blank" rel="noopener">Политикой обработки персональных данных</a></span>
+            </label>
+            <p class="err" id="f-consent-err" aria-live="polite"></p>
             <button class="btn-fill" type="submit" id="f-submit"><span class="btn-label">Записаться на замер</span></button>
             <p class="err" id="f-send-err" role="alert"></p>
-            <p class="legal"><span class="ember">*</span> Нажимая кнопку, вы соглашаетесь на обработку персональных данных</p>
           </div>
         </form>
 
@@ -830,6 +849,10 @@ html:has(.lightbox[open]) { overflow: hidden; }
       <div class="foot-row">
         <span class="foot-mid">Столешницы из акрилового камня</span>
         <p class="legal"><span class="ember">*</span> Модель столешницы и изделия в разделе «Что делаем»: 3D-визуализация. Оттенки на экране приблизительные</p>
+      </div>
+      <div class="foot-requisites">
+        <p class="legal">ИП Гулин Геннадий Викторович · ИНН 231000033316 · ОГРНИП 311231015200021 · г. Краснодар, Краснодарский край</p>
+        <p class="legal"><a href="mailto:info@akrilkrasnodar.ru">info@akrilkrasnodar.ru</a> · <a href="/privacy.html">Политика обработки персональных данных</a> · © Акрил Краснодар, 2026</p>
       </div>
     </footer>
   </div>
@@ -1425,6 +1448,8 @@ window.__defineScene = function () {
   var fName = document.getElementById('f-name');
   var fPhone = document.getElementById('f-phone');
   var fNote = document.getElementById('f-note');
+  var fConsent = document.getElementById('f-consent');
+  var consentErr = document.getElementById('f-consent-err');
   var sendErr = document.getElementById('f-send-err');
   var submit = document.getElementById('f-submit');
   var sending = false;
@@ -1486,6 +1511,8 @@ window.__defineScene = function () {
   }
 
   function setSendErr(msg) { sendErr.textContent = msg || ''; }
+  function setConsentErr(msg) { consentErr.textContent = msg || ''; }
+  fConsent.addEventListener('change', function () { if (fConsent.checked) setConsentErr(''); });
   fPhone.addEventListener('input', function (e) {
     var raw = fPhone.value;
     var pos = fPhone.selectionStart == null ? raw.length : fPhone.selectionStart;
@@ -1524,6 +1551,7 @@ window.__defineScene = function () {
     if (name.length < 2) { setErr('name', 'Напишите, как к вам обращаться'); first = first || fName; }
     if (digits.length !== 11) { setErr('phone', 'Введите номер полностью: 10 цифр после +7'); first = first || fPhone; }
     if (!kind) { setErr('kind', 'Выберите, что нужно изготовить'); first = first || form.querySelector('input[name="kind"]'); }
+    if (!fConsent.checked) { setConsentErr('Отметьте согласие на обработку персональных данных'); first = first || fConsent; }
     if (first) { first.focus(); return; }
     if (sending) return; // второй клик, пока заявка в пути, ничего не делает
     sending = true;
@@ -1578,6 +1606,7 @@ window.__defineScene = function () {
     prevDigits = '';
     ['name', 'phone', 'kind'].forEach(function (k) { setErr(k, ''); });
     setSendErr('');
+    setConsentErr('');
   }
   document.getElementById('form-reset').addEventListener('click', function () {
     swapBlocks(done, form, 150, function () {
